@@ -2,6 +2,11 @@ name: Build
 
 on:
   workflow_dispatch:
+    inputs:
+      os:
+        description: 'Leave only desired OS in the field'
+        required: false
+        default: 'windows-2019 | ubuntu-20.04 | macos-11.0'
 #  push:
 #    branches: [ '*' ]
 #    tags:
