@@ -2,11 +2,13 @@ name: Build
 
 on:
   workflow_dispatch:
-    inputs:
-      os:
-        description: 'Leave only desired OS in the field'
-        required: false
-        default: 'windows-2019 | ubuntu-20.04 | macos-11.0'
+# for MacOS, Debug via SSH
+#    inputs:
+#      os:
+#        description: 'Leave only desired OS in the field'
+#        required: false
+#        default: 'windows-2019 | ubuntu-20.04 | macos-11.0'
+
 #  push:
 #    branches: [ '*' ]
 #    tags:
@@ -20,10 +22,12 @@ jobs:
     container: docker://hhmhh/weylus_build:latest
     steps:
     - uses: actions/checkout@v3
+
     - uses: actions/cache@v3
       with:
         path: deps/dist*
         key: ${{ runner.os }}-deps-${{ hashFiles('deps/*') }}
+
     - uses: actions/cache@v3
       with:
         path: |
@@ -31,24 +35,37 @@ jobs:
           ~/.cargo/git
           target
         key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+
     - name: Build
       run: ./docker_build.sh
       shell: bash
+
+    - name: Debug via SSH
+      if: failure()
+      uses: luchihoratiu/debug-via-ssh@main
+      with:
+        NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+        SSH_PASS: ${{ secrets.SSH_PASS }}
+        NGROK_REGION: eu
+
     - name: Artifacts1
       uses: actions/upload-artifact@v2
       with:
         name: linux
         path: packages/weylus-linux.zip
+
     - name: Artifacts2
       uses: actions/upload-artifact@v2
       with:
         name: linux-deb
         path: packages/Weylus*.deb
+
     - name: Artifacts3
       uses: actions/upload-artifact@v3
       with:
         name: windows
         path: packages/weylus-windows.zip
+
     - name: Publish
       uses: softprops/action-gh-release@v1
       if: startsWith(github.ref, 'refs/tags/')
@@ -66,10 +83,12 @@ jobs:
     container: docker://hhmhh/weylus_build_alpine:latest
     steps:
     - uses: actions/checkout@v3
+
     - uses: actions/cache@v3
       with:
         path: deps/dist*
         key: ${{ runner.os }}-alpine-deps-${{ hashFiles('deps/*') }}
+
     - uses: actions/cache@v3
       with:
         path: |
@@ -80,11 +99,13 @@ jobs:
     - name: Build
       run: cargo build --release && cd target/release && tar czf weylus-linux-alpine-musl.tar.gz weylus
       shell: bash
+
     - name: Artifacts1
       uses: actions/upload-artifact@v2
       with:
         name: linux-alpine-musl
         path: target/release/weylus-linux-alpine-musl.tar.gz
+
     - name: Publish
       uses: softprops/action-gh-release@v1
       if: startsWith(github.ref, 'refs/tags/')
@@ -99,10 +120,12 @@ jobs:
     runs-on: macOS-latest
     steps:
     - uses: actions/checkout@v3
+
     - uses: actions/cache@v3
       with:
         path: deps/dist
         key: ${{ runner.os }}-deps-${{ hashFiles('deps/*') }}
+
     - uses: actions/cache@v3
       with:
         path: |
@@ -110,23 +133,28 @@ jobs:
           ~/.cargo/git
           target
         key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+
     - name: Download deps
       run: |
         npm install -g typescript
         brew install nasm
         cargo install cargo-bundle
       shell: bash
+
     - name: Build
       # run: MACOSX_DEPLOYMENT_TARGET=10.13 cargo bundle --release
       run: cargo bundle --release
+
     - name: Package
       run: cd target/release/bundle/osx/ && zip -r macOS.zip Weylus.app
+
     - name: Artifacts
       uses: actions/upload-artifact@v2
       with:
         name: ${{ runner.os }}
         path: |
           target/release/bundle/osx/macOS.zip
+
     - name: ArtifactsDebug
       if: failure()
       uses: actions/upload-artifact@v2
@@ -134,6 +162,7 @@ jobs:
         name: ${{ runner.os }}-ffbuild
         path: |
           deps/ffmpeg/ffbuild
+
     - name: Debug via SSH
       if: failure()
       uses: luchihoratiu/debug-via-ssh@main
@@ -141,6 +170,7 @@ jobs:
         NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
         SSH_PASS: ${{ secrets.SSH_PASS }}
         NGROK_REGION: eu
+
     - name: Publish
       uses: softprops/action-gh-release@v1
       if: startsWith(github.ref, 'refs/tags/')
